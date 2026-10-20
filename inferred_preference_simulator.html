@@ -1,0 +1,658 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inferred Preference Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap">
+<style>
+/* Layout: sticky control column (the experimenter's bench) beside a results column of small charts. */
+:root {
+  --bg: #f4f5f8; --panel: #ffffff; --ink: #16181d; --ink2: #5b606c; --line: #dfe2e8; --soft: #eceef3;
+  --accent: #2d5bd3; --heur: #c9711c; --naive: #7d8596;
+  --brownie: #6b3e26; --cupcake: #d6488f;
+  --f-display: "Source Serif 4", Georgia, serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111318; --panel: #1a1d24; --ink: #e8eaef; --ink2: #9ba1ad; --line: #2c3039; --soft: #242832;
+  --accent: #7e9df6; --heur: #f0a24f; --naive: #8f98aa; --brownie: #c48d63; --cupcake: #f07ab5; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111318; --panel: #1a1d24; --ink: #e8eaef; --ink2: #9ba1ad; --line: #2c3039; --soft: #242832;
+  --accent: #7e9df6; --heur: #f0a24f; --naive: #8f98aa; --brownie: #c48d63; --cupcake: #f07ab5; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-family: var(--f-display); font-weight: 600; font-size: 30px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-weight: 600; font-size: 18px; margin: 0; text-wrap: balance; }
+.lede { color: var(--ink2); max-width: 68ch; margin: 8px 0 0; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+.task { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin: 20px 0 24px;
+  padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.task .lbl { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); font-weight: 600; }
+.task .fixed { font-size: 11px; color: var(--ink2); border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; }
+.box { display: flex; gap: 5px; padding: 6px; border: 1.5px dashed var(--ink2); border-radius: 7px; }
+.it { width: 22px; height: 22px; border-radius: 4px; }
+.it.b { background: var(--brownie); }
+.it.c { background: var(--cupcake); border-radius: 50% 50% 4px 4px; }
+.task p { margin: 0; min-width: 0; flex: 1 1 320px; }
+
+.grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.controls { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 18px;
+  max-height: calc(100vh - 24px); overflow-y: auto; }
+@media (max-width: 900px) { .controls { position: static; max-height: none; } }
+fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+legend { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); font-weight: 600; padding: 0; margin-bottom: 8px; }
+.row { display: flex; flex-direction: column; gap: 4px; }
+.row > label, .row .lab { display: flex; justify-content: space-between; gap: 8px; font-weight: 500; }
+.row .val { font-family: var(--f-mono); color: var(--accent); font-size: 13px; }
+.hint { font-size: 12px; color: var(--ink2); }
+select, input[type=number] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 8px; width: 100%; box-sizing: border-box; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=range]:disabled { opacity: .35; }
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink2); font-weight: 400 !important; justify-content: flex-start !important; }
+.check input { accent-color: var(--accent); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pair label { font-size: 12px; color: var(--ink2); display: flex; flex-direction: column; gap: 2px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
+button { font: inherit; cursor: pointer; border-radius: 7px; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.run { background: var(--accent); color: var(--panel); border: 0; padding: 10px 12px; font-weight: 600; font-size: 15px; }
+.run:hover { filter: brightness(1.08); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets button { background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 4px 10px; font-size: 12px; border-radius: 99px; }
+.presets button:hover { border-color: var(--accent); color: var(--accent); }
+
+.results { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.card .sub { color: var(--ink2); font-size: 13px; margin: 4px 0 10px; max-width: 75ch; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 1100px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.chart { width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--ink2); font-family: var(--f-body); }
+svg .tick { font-family: var(--f-mono); font-size: 11px; }
+
+.status { font-size: 13px; color: var(--ink2); }
+.status b { color: var(--ink); font-weight: 600; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 10px; }
+@media (max-width: 560px) { .tiles { grid-template-columns: minmax(0, 1fr); } }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.tile .name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.sw { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.tile .big { font-family: var(--f-mono); font-size: 26px; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.1; }
+.tile .small { font-family: var(--f-mono); font-size: 12px; color: var(--ink2); }
+.tile .bar { height: 5px; background: var(--soft); border-radius: 3px; overflow: hidden; }
+.tile .bar i { display: block; height: 100%; }
+.tile .formula { font-size: 12px; color: var(--ink2); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--ink2); margin-bottom: 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tblwrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--ink2); font-size: 12px; }
+th:first-child, td:first-child { text-align: left; }
+td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+td.dec { font-family: var(--f-body); }
+.pos { color: var(--brownie); } .neg { color: var(--cupcake); }
+.heat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 560px) { .heat { grid-template-columns: minmax(0, 1fr); } }
+.heat figure { margin: 0; min-width: 0; }
+.heat figcaption { font-size: 12px; color: var(--ink2); margin-top: 4px; }
+.stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.segrow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; margin-bottom: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { background: var(--panel); color: var(--ink2); border: 0; border-radius: 0; padding: 5px 12px; font-size: 13px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chips button { background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 3px 10px; font-size: 12px; border-radius: 99px; }
+.chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.panel { cursor: pointer; }
+.panel:focus { outline: none; }
+.panel:focus-visible rect:first-child { stroke: var(--accent); stroke-width: 2; }
+.conf td, .conf th { text-align: center; }
+.conf td:first-child, .conf th:first-child { text-align: left; }
+.muted { color: var(--ink2); font-size: 11px; }
+#gridChart { position: relative; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--panel); font-size: 12px; line-height: 1.45; padding: 6px 9px; border-radius: 6px; white-space: nowrap; z-index: 5; transform: translate(-50%, calc(-100% - 10px)); }
+.tip b { font-weight: 600; }
+.hit { cursor: default; }
+footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<div class="wrap">
+  <header>
+    <h1>Inferred Preference Simulator</h1>
+    <p class="lede">Simulate participants in the experiment. Each one watches A's decision under every K × W condition and rates how much A likes brownie and how much A likes cupcake. Three groups of participants answer as the three candidate models would, plus response noise.</p>
+  </header>
+
+  <section class="task" aria-label="Task">
+    <span class="lbl">Task</span>
+    <div class="box" aria-label="2 brownies and 2 cupcakes"><span class="it b"></span><span class="it b"></span><span class="it c"></span><span class="it c"></span></div>
+    <p>A box holds <b>2 brownies</b> and <b>2 cupcakes</b>. A keeps 2 and B gets the rest. The participant is told what A knows about B (K) and how much A cares about B (W), sees what A kept, then rates on two 0–100 sliders: <b>how much does A like brownie?</b> and <b>how much does A like cupcake?</b></p>
+    <span class="fixed">27 trials per participant: 3 K × 3 W × 3 decisions</span>
+  </section>
+
+  <div class="grid">
+    <form class="controls" id="controls" autocomplete="off" novalidate>
+      <fieldset>
+        <legend>Bayesian participants</legend>
+        <div class="row">
+          <label for="beta">Assumed rationality of A, β <span class="val" id="betaV"></span></label>
+          <input type="range" id="beta" min="0" max="100" step="1" value="65">
+          <span class="hint">0.5 (A chooses noisily) to 50 (A always picks the best option)</span>
+        </div>
+        <div class="row">
+          <span class="lab">Diminishing returns ρ ~ Beta(a, b)</span>
+          <label class="check"><input type="checkbox" id="rhoOn" checked> A second item of a kind is worth less</label>
+          <div class="pair">
+            <label>a <input type="number" id="rhoA" min="0.1" max="20" step="0.1" value="4"></label>
+            <label>b <input type="number" id="rhoB" min="0.1" max="20" step="0.1" value="2"></label>
+          </div>
+          <span class="hint" id="rhoHint"></span>
+        </div>
+        <div class="row">
+          <label for="norm">Weight scale</label>
+          <select id="norm">
+            <option value="sum1">w_A + w_B = 1</option>
+            <option value="fixA">w_A fixed at 1</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="proj">Projection prior λ <span class="val" id="projV"></span></label>
+          <input type="range" id="proj" min="-20" max="20" step="1" value="0">
+          <span class="hint">λ &gt; 0: a caring A is assumed to share B's taste. λ &lt; 0: contrast.</span>
+        </div>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>Heuristic participants</legend>
+        <div class="row">
+          <label for="gamma">Correction strength γ <span class="val" id="gammaV"></span></label>
+          <input type="range" id="gamma" min="0" max="30" step="1" value="10">
+          <span class="hint">pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1)</span>
+        </div>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>All participants</legend>
+        <div class="row">
+          <label for="sigma">Response noise σ <span class="val" id="sigmaV"></span></label>
+          <input type="range" id="sigma" min="0" max="40" step="1" value="15">
+          <span class="hint">SD of each slider rating, in points on the 0–100 scale</span>
+        </div>
+        <div class="row">
+          <label for="indiv">Individual differences <span class="val" id="indivV"></span></label>
+          <input type="range" id="indiv" min="0" max="20" step="1" value="5">
+          <span class="hint">SD of each participant's overall offset on both sliders</span>
+        </div>
+      </fieldset>
+      <hr>
+      <fieldset>
+        <legend>Run</legend>
+        <div class="pair">
+          <label>Participants per model <input type="number" id="N" min="5" max="5000" step="1" value="1000"></label>
+          <label>Seed <input type="number" id="seed" min="1" max="999999" step="1" value="644"></label>
+        </div>
+        <button type="submit" class="run" id="runBtn">Simulate</button>
+        <span class="hint">Results update as you move a control. The button draws a fresh seed. Try about 40 participants to see what a real study would give.</span>
+      </fieldset>
+    </form>
+
+    <main class="results">
+      <div class="card">
+        <h2>Mean ratings in every condition</h2>
+        <p class="sub" id="gridSub"></p>
+        <div class="segrow">
+          <div class="seg" role="group" aria-label="Rating shown">
+            <button type="button" data-v="diff" aria-pressed="true">Brownie − cupcake</button>
+            <button type="button" data-v="b" aria-pressed="false">Brownie rating</button>
+            <button type="button" data-v="c" aria-pressed="false">Cupcake rating</button>
+          </div>
+          <div class="legend" id="legend"></div>
+        </div>
+        <div class="chart" id="gridChart"></div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <h2>Can the data tell the models apart?</h2>
+          <p class="sub">Each simulated participant's 54 ratings are compared with each model's predictions, and the participant is assigned to the closest model (least squared error). Rows: the model that generated the participant. Columns: the model it was assigned to.</p>
+          <div class="tblwrap"><table id="confusion" class="conf"></table></div>
+          <p class="status" id="recov"></p>
+        </div>
+        <div class="card">
+          <h2>Most diagnostic trials</h2>
+          <p class="sub">The 8 of the 27 trials where the three models disagree most. Numbers are each model's noise-free predicted brownie − cupcake rating for that trial, not any one participant's data. These trials carry the most information about which model participants use.</p>
+          <div class="tblwrap"><table id="diag"></table></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Individual participants in one condition</h2>
+        <p class="sub" id="stripSub"></p>
+        <div class="chips" id="condChips"></div>
+        <div class="chart" id="strip"></div>
+      </div>
+
+      <div class="card">
+        <h2>All 27 trials</h2>
+        <p class="sub">Simulated mean rating, brownie / cupcake, out of 100. Noise-free model predictions are in brackets.</p>
+        <div class="tblwrap"><table id="allTable"></table></div>
+      </div>
+    </main>
+  </div>
+
+  <footer>
+    Bayesian participants: P(R<sub>A</sub> | d, K, W) ∝ P(d | R<sub>A</sub>, K, W) · P(R<sub>A</sub> | K, W), with U(d) = w<sub>A</sub>·R<sub>A</sub>(A's share) + w<sub>B</sub>·E<sub>K</sub>[R<sub>B</sub>(B's share)] and P(d) ∝ exp(β·U). W is known only as a condition; the likelihood is averaged over care values inside it. Their ratings are 100·E[r<sub>brownie</sub>] and 100·E[r<sub>cupcake</sub>] under the posterior; the prior over R<sub>A</sub> is uniform on an 11 × 11 grid. Heuristic participants (Kelley's discounting / augmentation): pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1), with k = +1, −1, 0 for B prefers brownie, cupcake, unknown and s<sub>W</sub> = 0, 0.5, 1 for A cares more about self, equally, more about B. Choice-as-preference participants: pref = choice. For these two models the ratings are 50 + 50·pref (brownie) and 50 − 50·pref (cupcake). Every rating gets the participant's offset plus Gaussian noise, then is rounded and clipped to 0–100.
+  </footer>
+</div>
+<script>
+// ===== Inferred-preference model engine (port of inferred_preference_model.py) =====
+const BOX = [2, 2], KEEP = 2;
+const R_GRID = Array.from({length: 11}, (_, i) => i / 10);
+const R_SPACE = [];
+for (const a of R_GRID) for (const b of R_GRID) R_SPACE.push([a, b]);
+const NR = R_SPACE.length;
+const CARE_GRID = Array.from({length: 21}, (_, i) => i / 20);
+const DECS = [[2, 0], [1, 1], [0, 2]];
+const close = (a, b) => Math.abs(a - b) < 1e-9;
+
+function maskNorm(m) { const s = m.reduce((a, b) => a + b, 0); return m.map(v => v / s); }
+
+function beliefK(kind) {
+  return maskNorm(R_SPACE.map(([r1, r2]) => {
+    if (kind === "unknown") return 1;
+    if (kind === "brownie") return r1 > r2 ? 1 : 0;
+    if (kind === "cupcake") return r2 > r1 ? 1 : 0;
+    if (kind === "both") return close(r1, r2) ? 1 : 0;
+    throw kind;
+  }));
+}
+function tasteMask(kind) { return beliefK(kind === "random" ? "unknown" : kind); }
+
+function beliefW(kind, c) {
+  return maskNorm(CARE_GRID.map(g => {
+    if (kind === "exact") return close(g, c) ? 1 : 0;
+    if (kind === "unknown") return 1;
+    if (kind === "category") {
+      if (c < 0.5 - 1e-9) return g < 0.5 - 1e-9 ? 1 : 0;
+      if (c > 0.5 + 1e-9) return g > 0.5 + 1e-9 ? 1 : 0;
+      return close(g, 0.5) ? 1 : 0;
+    }
+    throw kind;
+  }));
+}
+function weights(c, norm) {
+  if (norm === "sum1") return [1 - c, c];
+  const cc = Math.min(c, 0.95);
+  return [1, cc / (1 - cc)];
+}
+function Dsc(x, rho) { return close(rho, 1) ? x : (1 - Math.pow(rho, x)) / (1 - rho + 1e-12); }
+
+// ---- Beta CDF (regularized incomplete beta) ----
+function lgamma(z) {
+  const g = 7, c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lgamma(1 - z);
+  z -= 1; let x = c[0];
+  for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+  const t = z + g + 0.5;
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+function betacf(a, b, x) {
+  const MAXIT = 300, EPS = 3e-14, FPMIN = 1e-300;
+  let qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap;
+  if (Math.abs(d) < FPMIN) d = FPMIN; d = 1 / d; let h = d;
+  for (let m = 1; m <= MAXIT; m++) {
+    const m2 = 2 * m;
+    let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d; h *= d * c;
+    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d; const del = d * c; h *= del;
+    if (Math.abs(del - 1) < EPS) break;
+  }
+  return h;
+}
+function betaCDF(x, a, b) {
+  if (x <= 0) return 0; if (x >= 1) return 1;
+  const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b;
+}
+function rhoPrior(rho) { // rho: null (no discounting) or [a, b]
+  if (!rho) return {mids: [1], w: [1]};
+  const n = 25, mids = [], w = [];
+  for (let i = 0; i < n; i++) {
+    mids.push((i + 0.5) / n);
+    w.push(betaCDF((i + 1) / n, rho[0], rho[1]) - betaCDF(i / n, rho[0], rho[1]));
+  }
+  return {mids, w: maskNorm(w)};
+}
+
+// expected B rewards under K
+function EK(K) { let e1 = 0, e2 = 0; K.forEach((p, i) => { e1 += p * R_SPACE[i][0]; e2 += p * R_SPACE[i][1]; }); return [e1, e2]; }
+
+// softmax choice probs for one R_A row, one (wA,wB,rho)
+function choiceProbs(r1, r2, Er1, Er2, wA, wB, rh, beta) {
+  const [n1, n2] = BOX, U = DECS.map(([x, y]) =>
+    beta * (wA * (r1 * Dsc(x, rh) + r2 * Dsc(y, rh)) + wB * (Er1 * Dsc(n1 - x, rh) + Er2 * Dsc(n2 - y, rh))));
+  const m = Math.max(...U), e = U.map(u => Math.exp(u - m)), s = e[0] + e[1] + e[2];
+  return e.map(v => v / s);
+}
+
+// likelihood L[iR][j], marginalised over W belief and rho prior
+function likelihood(K, pW, beta, rp, norm) {
+  const [Er1, Er2] = EK(K);
+  const L = Array.from({length: NR}, () => [0, 0, 0]);
+  CARE_GRID.forEach((c, wi) => {
+    if (pW[wi] <= 0) return;
+    const [wA, wB] = weights(c, norm);
+    rp.mids.forEach((rh, ri) => {
+      const p = pW[wi] * rp.w[ri];
+      for (let i = 0; i < NR; i++) {
+        const P = choiceProbs(R_SPACE[i][0], R_SPACE[i][1], Er1, Er2, wA, wB, rh, beta);
+        L[i][0] += p * P[0]; L[i][1] += p * P[1]; L[i][2] += p * P[2];
+      }
+    });
+  });
+  return L;
+}
+function priorRA(K, pW, projection, norm) {
+  let care = 0;
+  CARE_GRID.forEach((c, i) => { const [a, b] = weights(c, norm); care += pW[i] * b / (a + b); });
+  let dB = 0; K.forEach((p, i) => dB += p * (R_SPACE[i][0] - R_SPACE[i][1]));
+  const lp = R_SPACE.map(([r1, r2]) => projection * care * (r1 - r2) * dB * 10);
+  const m = Math.max(...lp);
+  return maskNorm(lp.map(v => Math.exp(v - m)));
+}
+// returns posteriors for all three decisions
+function posteriors(K, pW, beta, rp, projection, norm) {
+  const L = likelihood(K, pW, beta, rp, norm), pr = priorRA(K, pW, projection, norm);
+  return [0, 1, 2].map(j => maskNorm(L.map((row, i) => row[j] * pr[i])));
+}
+function summarize(post) {
+  let pB = 0, pC = 0, e = 0;
+  post.forEach((p, i) => { const [r1, r2] = R_SPACE[i]; if (r1 > r2) pB += p; else if (r2 > r1) pC += p; e += p * (r1 - r2); });
+  return {pB, pC, pE: 1 - pB - pC, index: pB - pC, e};
+}
+
+if (typeof module !== "undefined") module.exports = {beliefK, beliefW, rhoPrior, posteriors, summarize, likelihood, CARE_GRID, R_SPACE};
+// ===== App: simulate participants rating A's preference =====
+const $ = id => document.getElementById(id);
+const DEC_LBL = ["2 brownies", "1 + 1", "2 cupcakes"];
+const KS = ["unknown", "brownie", "cupcake"];
+const K_LBL = {unknown: "A doesn't know B", brownie: "A knows B prefers brownie", cupcake: "A knows B prefers cupcake"};
+const K_SHORT = {unknown: "K: unknown", brownie: "K: B ▸ brownie", cupcake: "K: B ▸ cupcake"};
+const K_CODE = {unknown: 0, brownie: 1, cupcake: -1};
+const WS = ["self", "equal", "B"];
+const W_LBL = {self: "A cares more about self", equal: "A cares equally", B: "A cares more about B"};
+const W_SHORT = {self: "W: self > B", equal: "W: equal", B: "W: B > self"};
+const S_W = {self: 0, equal: 0.5, B: 1};
+const MODELS = [
+  {key: "bayes", name: "Bayesian", color: "var(--accent)"},
+  {key: "heur", name: "Heuristic", color: "var(--heur)"},
+  {key: "choice", name: "Choice as preference", color: "var(--naive)"},
+];
+const betaFrom = v => 0.5 * Math.pow(100, v / 100);
+
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(rng) { let u = 0, v = 0; while (u === 0) u = rng(); v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function wBelief(W) {
+  return maskNorm(CARE_GRID.map(g => W === "self" ? (g < 0.5 - 1e-9 ? 1 : 0) : W === "B" ? (g > 0.5 + 1e-9 ? 1 : 0) : (close(g, 0.5) ? 1 : 0)));
+}
+
+// the 27 trials
+const TRIALS = [];
+for (const K of KS) for (const W of WS) for (let d = 0; d < 3; d++) TRIALS.push({K, W, d});
+
+function readParams() {
+  const a = Math.min(20, Math.max(0.1, +$("rhoA").value || 4)), b = Math.min(20, Math.max(0.1, +$("rhoB").value || 2));
+  return {
+    beta: betaFrom(+$("beta").value), rho: $("rhoOn").checked ? [a, b] : null, norm: $("norm").value,
+    proj: +$("proj").value / 10, gamma: +$("gamma").value / 10,
+    sigma: +$("sigma").value, indiv: +$("indiv").value,
+    N: Math.min(5000, Math.max(5, Math.round(+$("N").value || 1000))), seed: Math.round(+$("seed").value || 1),
+  };
+}
+function syncLabels() {
+  const P = readParams();
+  $("betaV").textContent = P.beta.toFixed(1);
+  $("projV").textContent = (P.proj >= 0 ? "+" : "") + P.proj.toFixed(1);
+  $("gammaV").textContent = P.gamma.toFixed(1);
+  $("sigmaV").textContent = P.sigma;
+  $("indivV").textContent = P.indiv;
+  $("rhoA").disabled = $("rhoB").disabled = !P.rho;
+  const m = P.rho ? P.rho[0] / (P.rho[0] + P.rho[1]) : 1;
+  $("rhoHint").textContent = P.rho ? `mean ρ = ${m.toFixed(2)}: a 2nd item is worth ${m.toFixed(2)}× the 1st on average` : "ρ = 1: every item is worth the same";
+  $("runBtn").textContent = `Simulate ${P.N.toLocaleString()} participants per model`;
+}
+
+// noise-free predictions: pred[model][trialIndex] = {b, c} on 0-100
+function predictions(P) {
+  const rp = rhoPrior(P.rho), post = {};
+  for (const K of KS) for (const W of WS) {
+    const ps = posteriors(beliefK(K), wBelief(W), P.beta, rp, P.proj, P.norm);
+    post[K + W] = ps.map(p => {
+      let eb = 0, ec = 0; p.forEach((v, i) => { eb += v * R_SPACE[i][0]; ec += v * R_SPACE[i][1]; });
+      return {b: 100 * eb, c: 100 * ec, post: p, s: summarize(p)};
+    });
+  }
+  const pred = {bayes: [], heur: [], choice: []};
+  TRIALS.forEach(t => {
+    const ch = (DECS[t.d][0] - DECS[t.d][1]) / KEEP;
+    const h = Math.max(-1, Math.min(1, ch + P.gamma * S_W[t.W] * K_CODE[t.K]));
+    const B = post[t.K + t.W][t.d];
+    pred.bayes.push({b: B.b, c: B.c});
+    pred.heur.push({b: 50 + 50 * h, c: 50 - 50 * h});
+    pred.choice.push({b: 50 + 50 * ch, c: 50 - 50 * ch});
+  });
+  return {pred, post};
+}
+
+function simulate(P) {
+  const {pred, post} = predictions(P);
+  const rng = mulberry32(P.seed * 9973 + 17);
+  const clip = v => Math.max(0, Math.min(100, Math.round(v)));
+  const data = {};
+  for (const m of MODELS) {
+    const subs = [];
+    for (let s = 0; s < P.N; s++) {
+      const off = P.indiv * gauss(rng);
+      subs.push(pred[m.key].map(p => ({b: clip(p.b + off + P.sigma * gauss(rng)), c: clip(p.c + off + P.sigma * gauss(rng))})));
+    }
+    data[m.key] = subs;
+  }
+  // model recovery: assign each participant to the closest model
+  const conf = {};
+  for (const gen of MODELS) {
+    conf[gen.key] = {bayes: 0, heur: 0, choice: 0};
+    for (const sub of data[gen.key]) {
+      let best = null, bestE = Infinity;
+      for (const fit of MODELS) {
+        let e = 0;
+        sub.forEach((r, i) => { const p = pred[fit.key][i]; e += (r.b - p.b) ** 2 + (r.c - p.c) ** 2; });
+        if (e < bestE - 1e-9) { bestE = e; best = fit.key; }
+      }
+      conf[gen.key][best]++;
+    }
+  }
+  // summary stats per model x trial
+  const stats = {};
+  for (const m of MODELS) {
+    stats[m.key] = TRIALS.map((_, i) => {
+      const n = data[m.key].length;
+      const val = {b: [], c: [], diff: []};
+      data[m.key].forEach(sub => { val.b.push(sub[i].b); val.c.push(sub[i].c); val.diff.push(sub[i].b - sub[i].c); });
+      const o = {};
+      for (const k of ["b", "c", "diff"]) {
+        const mean = val[k].reduce((a, v) => a + v, 0) / n;
+        const sd = Math.sqrt(val[k].reduce((a, v) => a + (v - mean) ** 2, 0) / Math.max(1, n - 1));
+        o[k] = {mean, sd, vals: val[k]};
+      }
+      return o;
+    });
+  }
+  return {pred, post, data, conf, stats};
+}
+
+// ---------- SVG helpers ----------
+const NS = "http://www.w3.org/2000/svg";
+function S(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function T(parent, x, y, str, attrs = {}) { const e = S("text", {x, y, ...attrs}, parent); e.textContent = str; return e; }
+function svgFor(el, h) { el.innerHTML = ""; const w = Math.max(280, el.clientWidth || 600); const svg = S("svg", {viewBox: `0 0 ${w} ${h}`, width: w, height: h, role: "img"}, el); return {svg, w, h}; }
+const sgn = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v);
+
+// ---------- state ----------
+let LAST = null, VIEW = "diff", SEL = {K: "brownie", W: "B"};
+const range = () => VIEW === "diff" ? [-100, 100] : [0, 100];
+const viewName = () => VIEW === "diff" ? "brownie − cupcake rating" : VIEW === "b" ? "brownie rating" : "cupcake rating";
+const trialIdx = (K, W, d) => KS.indexOf(K) * 9 + WS.indexOf(W) * 3 + d;
+
+function render() {
+  if (!LAST) return;
+  $("legend").innerHTML = MODELS.map(m => `<span><span class="sw" style="background:${m.color}"></span>${m.name}</span>`).join("");
+  $("gridSub").textContent = `Each panel is one K × W condition; x is what A kept. Dots: mean ${viewName()} across ${LAST.P.N.toLocaleString()} participants per model. Bars: ±1 SD across participants.`;
+  drawGrid(); drawConfusion(); drawDiag(); drawStrip(); drawAll();
+}
+
+function drawGrid() {
+  const el = $("gridChart"), W0 = el.clientWidth || 800, narrow = W0 < 620;
+  const cols = narrow ? 1 : 3, rows = narrow ? 9 : 3;
+  const headH = narrow ? 0 : 22, rowLab = narrow ? 0 : 0;
+  const panelH = 190, gapX = 14, gapY = 14;
+  const H = headH + rows * (panelH + gapY);
+  const {svg, w} = svgFor(el, H);
+  const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; el.appendChild(tip);
+  const panelW = (w - rowLab - gapX * (cols - 1)) / cols;
+  const [lo, hi] = range();
+  if (!narrow) WS.forEach((W, j) => T(svg, rowLab + j * (panelW + gapX) + panelW / 2, 14, W_LBL[W], {"text-anchor": "middle", "font-size": 12, "font-weight": 600, style: "fill:var(--ink)"}));
+  KS.forEach((K, i) => WS.forEach((W, j) => {
+    const idx = narrow ? i * 3 + j : null;
+    const ox = narrow ? 0 : rowLab + j * (panelW + gapX), oy = headH + (narrow ? idx : i) * (panelH + gapY);
+    const g = S("g", {"aria-label": `${K_LBL[K]}, ${W_LBL[W]}`}, svg);
+    S("rect", {x: ox, y: oy, width: panelW, height: panelH, rx: 8, fill: "var(--panel)", stroke: "var(--line)"}, g);
+    T(g, ox + 10, oy + 17, narrow ? `${K_LBL[K]} · ${W_LBL[W]}` : (j === 0 ? K_LBL[K] : ""), {"font-size": 11.5, "font-weight": 600, style: "fill:var(--ink)"});
+    const L = ox + 40, R = ox + panelW - 10, top = oy + 28, bot = oy + panelH - 26;
+    const ys = v => top + (hi - v) / (hi - lo) * (bot - top);
+    const ticks = VIEW === "diff" ? [-100, 0, 100] : [0, 50, 100];
+    ticks.forEach(v => {
+      S("line", {x1: L, x2: R, y1: ys(v), y2: ys(v), stroke: "var(--line)", "stroke-width": v === 0 && VIEW === "diff" ? 1.4 : 1}, g);
+      T(g, L - 5, ys(v) + 4, VIEW === "diff" ? sgn(v) : String(v), {class: "tick", "text-anchor": "end"});
+    });
+    const cw = (R - L) / 3;
+    [0, 1, 2].forEach(d => T(g, L + cw * (d + 0.5), bot + 16, DEC_LBL[d], {"text-anchor": "middle", "font-size": 11}));
+    MODELS.forEach((m, k) => {
+      const dx = (k - 1) * Math.min(14, cw / 5);
+      const pts = [0, 1, 2].map(d => { const st = LAST.sim.stats[m.key][trialIdx(K, W, d)][VIEW]; return [L + cw * (d + 0.5) + dx, st.mean, st.sd]; });
+      S("polyline", {points: pts.map(p => `${p[0]},${ys(p[1])}`).join(" "), fill: "none", stroke: m.color, "stroke-width": 1.5, "stroke-opacity": 0.55}, g);
+      pts.forEach(([x, mu, sd], d) => {
+        S("line", {x1: x, x2: x, y1: ys(Math.min(hi, mu + sd)), y2: ys(Math.max(lo, mu - sd)), stroke: m.color, "stroke-width": 1.5, "stroke-opacity": 0.6}, g);
+        const dot = S("circle", {cx: x, cy: ys(mu), r: 4, fill: m.color}, g);
+        const hit = S("circle", {cx: x, cy: ys(mu), r: 10, fill: "transparent", class: "hit"}, g);
+        const p = LAST.sim.pred[m.key][trialIdx(K, W, d)];
+        const pv = VIEW === "diff" ? p.b - p.c : VIEW === "b" ? p.b : p.c;
+        const f = v => VIEW === "diff" ? sgn(+v.toFixed(1)) : v.toFixed(1);
+        const show = () => {
+          tip.innerHTML = `<b>${m.name}</b> · A keeps ${DEC_LBL[d]}<br>${K_LBL[K]}, ${W_LBL[W].replace("A ", "")}<br>${viewName()}: mean ${f(mu)}, SD ${sd.toFixed(1)}<br>model prediction (no noise): ${f(pv)}`;
+          tip.style.left = x + "px"; tip.style.top = ys(mu) + "px"; tip.hidden = false; dot.setAttribute("r", 6);
+        };
+        const hide = () => { tip.hidden = true; dot.setAttribute("r", 4); };
+        hit.addEventListener("pointerenter", show); hit.addEventListener("pointerleave", hide);
+        hit.addEventListener("pointerdown", show);
+      });
+    });
+  }));
+}
+
+function drawConfusion() {
+  const {conf} = LAST.sim, N = LAST.P.N;
+  let html = `<thead><tr><th>Generated by ↓ · assigned to →</th>${MODELS.map(m => `<th>${m.name}</th>`).join("")}</tr></thead><tbody>`;
+  let correct = 0;
+  MODELS.forEach(g => {
+    html += `<tr><td class="dec"><span class="sw" style="background:${g.color};display:inline-block;margin-right:6px"></span>${g.name}</td>`;
+    MODELS.forEach(f => {
+      const p = conf[g.key][f.key] / N; if (g.key === f.key) correct += conf[g.key][f.key];
+      html += `<td style="background:color-mix(in srgb, var(--accent) ${(p * 55).toFixed(0)}%, transparent)">${(100 * p).toFixed(1)}%</td>`;
+    });
+    html += "</tr>";
+  });
+  $("confusion").innerHTML = html + "</tbody>";
+  $("recov").innerHTML = `Overall, <b>${(100 * correct / (3 * N)).toFixed(1)}%</b> of participants are assigned to the model that generated them (chance = 33.3%).`;
+}
+
+function drawDiag() {
+  const {pred} = LAST.sim;
+  const rows = TRIALS.map((t, i) => {
+    const v = MODELS.map(m => pred[m.key][i].b - pred[m.key][i].c);
+    return {t, v, spread: Math.max(...v) - Math.min(...v)};
+  }).sort((a, b) => b.spread - a.spread).slice(0, 8);
+  let html = `<thead><tr><th>Condition</th><th>A keeps</th>${MODELS.map(m => `<th>${m.name.split(" ")[0]}</th>`).join("")}</tr></thead><tbody>`;
+  rows.forEach(r => {
+    html += `<tr><td class="dec">${K_SHORT[r.t.K].slice(3)} · ${W_SHORT[r.t.W].slice(3)}</td><td class="dec">${DEC_LBL[r.t.d]}</td>${r.v.map(x => `<td class="${x > 0.5 ? "pos" : x < -0.5 ? "neg" : ""}">${sgn(Math.round(x))}</td>`).join("")}</tr>`;
+  });
+  $("diag").innerHTML = html + "</tbody>";
+}
+
+function drawStrip() {
+  const {K, W} = SEL;
+  $("stripSub").textContent = `${K_LBL[K]}, ${W_LBL[W]}. Each dot is one participant's ${viewName()} (up to 300 per model); the dark tick is the mean.`;
+  $("condChips").innerHTML = KS.flatMap(k => WS.map(w => `<button type="button" data-k="${k}" data-w="${w}" aria-pressed="${k === K && w === W}">${K_SHORT[k].slice(3)} · ${W_SHORT[w].slice(3)}</button>`)).join("");
+  const {svg, w, h} = svgFor($("strip"), 260);
+  const [lo, hi] = range(), L = 40, R = w - 8, top = 10, bot = h - 26;
+  const ys = v => top + (hi - v) / (hi - lo) * (bot - top);
+  (VIEW === "diff" ? [-100, -50, 0, 50, 100] : [0, 25, 50, 75, 100]).forEach(v => {
+    S("line", {x1: L, x2: R, y1: ys(v), y2: ys(v), stroke: "var(--line)"}, svg);
+    T(svg, L - 5, ys(v) + 4, VIEW === "diff" ? sgn(v) : String(v), {class: "tick", "text-anchor": "end"});
+  });
+  const cw = (R - L) / 3, jr = mulberry32(11);
+  [0, 1, 2].forEach(d => {
+    T(svg, L + cw * (d + 0.5), h - 6, `A keeps ${DEC_LBL[d]}`, {"text-anchor": "middle", "font-size": 12, style: "fill:var(--ink)"});
+    MODELS.forEach((m, k) => {
+      const st = LAST.sim.stats[m.key][trialIdx(K, W, d)][VIEW];
+      const cx = L + cw * d + cw * (k + 1) / 4, half = Math.min(18, cw / 10);
+      const g = S("g", {fill: m.color, "fill-opacity": 0.35}, svg);
+      st.vals.slice(0, 300).forEach(v => S("circle", {cx: cx + (jr() - 0.5) * 2 * half, cy: ys(v + (jr() - 0.5) * 1.5), r: 2.2}, g));
+      S("line", {x1: cx - half - 4, x2: cx + half + 4, y1: ys(st.mean), y2: ys(st.mean), stroke: "var(--ink)", "stroke-width": 2.5}, svg);
+    });
+  });
+}
+
+function drawAll() {
+  const {stats, pred} = LAST.sim;
+  let html = `<thead><tr><th>K</th><th>W</th><th>A keeps</th>${MODELS.map(m => `<th>${m.name}</th>`).join("")}</tr></thead><tbody>`;
+  TRIALS.forEach((t, i) => {
+    html += `<tr><td class="dec">${K_SHORT[t.K].slice(3)}</td><td class="dec">${W_SHORT[t.W].slice(3)}</td><td class="dec">${DEC_LBL[t.d]}</td>` +
+      MODELS.map(m => { const s = stats[m.key][i], p = pred[m.key][i];
+        return `<td><span class="pos">${s.b.mean.toFixed(0)}</span> / <span class="neg">${s.c.mean.toFixed(0)}</span> <span class="muted">(${p.b.toFixed(0)} / ${p.c.toFixed(0)})</span></td>`; }).join("") + "</tr>";
+  });
+  $("allTable").innerHTML = html + "</tbody>";
+}
+
+// ---------- wiring ----------
+function run() { syncLabels(); const P = readParams(); LAST = {P, sim: simulate(P)}; render(); }
+let timer = null;
+const schedule = () => { syncLabels(); clearTimeout(timer); timer = setTimeout(run, 120); };
+$("controls").addEventListener("input", schedule);
+$("controls").addEventListener("change", schedule);
+$("controls").addEventListener("submit", e => { e.preventDefault(); $("seed").value = 1 + Math.floor(Math.random() * 999998); run(); });
+document.querySelector(".seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return; VIEW = b.dataset.v;
+  document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b)); render();
+});
+$("condChips").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { SEL = {K: b.dataset.k, W: b.dataset.w}; render(); } });
+let rw = 0;
+new ResizeObserver(() => { const w = document.querySelector(".results").clientWidth; if (Math.abs(w - rw) > 4) { rw = w; render(); } }).observe(document.querySelector(".results"));
+run();
+</script>
+</html>
