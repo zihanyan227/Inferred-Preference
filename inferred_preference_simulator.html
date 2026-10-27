@@ -101,6 +101,8 @@ th:first-child, td:first-child { text-align: left; }
 td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
 td.dec { font-family: var(--f-body); }
 .pos { color: var(--brownie); } .neg { color: var(--cupcake); }
+svg .tB { fill: var(--brownie); font-weight: 600; } svg .tC { fill: var(--cupcake); font-weight: 600; }
+.box { flex-wrap: wrap; max-width: 100%; }
 .heat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 @media (max-width: 560px) { .heat { grid-template-columns: minmax(0, 1fr); } }
 .heat figure { margin: 0; min-width: 0; }
@@ -135,13 +137,26 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
 
   <section class="task" aria-label="Task">
     <span class="lbl">Task</span>
-    <div class="box" aria-label="2 brownies and 2 cupcakes"><span class="it b"></span><span class="it b"></span><span class="it c"></span><span class="it c"></span></div>
-    <p>A box holds <b>2 brownies</b> and <b>2 cupcakes</b>. A keeps 2 and B gets the rest. The participant is told what A knows about B (K) and how much A cares about B (W), sees what A kept, then rates on two 0–100 sliders: <b>how much does A like brownie?</b> and <b>how much does A like cupcake?</b></p>
-    <span class="fixed">27 trials per participant: 3 K × 3 W × 3 decisions</span>
+    <div class="box" id="boxViz" aria-label=""></div>
+    <p>A box holds <b id="taskBox"></b>. A keeps <b id="taskKeep"></b> and B gets the rest. The participant is told what A knows about B (K) and how much A cares about B (W), sees what A kept, then rates on two 0–100 sliders: <b>how much does A like brownie?</b> and <b>how much does A like cupcake?</b></p>
+    <span class="fixed" id="taskTrials"></span>
   </section>
 
   <div class="grid">
     <form class="controls" id="controls" autocomplete="off" novalidate>
+      <fieldset>
+        <legend>Box</legend>
+        <div class="pair">
+          <label>Brownies <select id="nB"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select></label>
+          <label>Cupcakes <select id="nC"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select></label>
+        </div>
+        <div class="row">
+          <label for="keep">Items A keeps</label>
+          <select id="keep"></select>
+          <span class="hint" id="keepHint"></span>
+        </div>
+      </fieldset>
+      <hr>
       <fieldset>
         <legend>Bayesian participants</legend>
         <div class="row">
@@ -157,6 +172,14 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
             <label>b <input type="number" id="rhoB" min="0.1" max="20" step="0.1" value="2"></label>
           </div>
           <span class="hint" id="rhoHint"></span>
+        </div>
+        <div class="row">
+          <label for="taste">Taste space (r<sub>brownie</sub>, r<sub>cupcake</sub>)</label>
+          <select id="taste">
+            <option value="indep">Independent: each 0–1 (11 × 11 grid)</option>
+            <option value="sum1">r_brownie + r_cupcake = 1</option>
+          </select>
+          <span class="hint">Applies to A's and B's tastes, Bayesian participants only. With the sum constraint, the two ratings add to 100.</span>
         </div>
         <div class="row">
           <label for="norm">Weight scale</label>
@@ -177,7 +200,7 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
         <div class="row">
           <label for="gamma">Correction strength γ <span class="val" id="gammaV"></span></label>
           <input type="range" id="gamma" min="0" max="30" step="1" value="10">
-          <span class="hint">pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1)</span>
+          <span class="hint">choice = −1 if A kept every cupcake, +1 if A kept every brownie, otherwise (brownies − cupcakes kept) / items kept. pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1)</span>
         </div>
       </fieldset>
       <hr>
@@ -224,13 +247,13 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
       <div class="stack">
         <div class="card">
           <h2>Can the data tell the models apart?</h2>
-          <p class="sub">Each simulated participant's 54 ratings are compared with each model's predictions, and the participant is assigned to the closest model (least squared error). Rows: the model that generated the participant. Columns: the model it was assigned to.</p>
+          <p class="sub">Each simulated participant's <span id="nRatings">54</span> ratings are compared with each model's predictions, and the participant is assigned to the closest model (least squared error). Rows: the model that generated the participant. Columns: the model it was assigned to.</p>
           <div class="tblwrap"><table id="confusion" class="conf"></table></div>
           <p class="status" id="recov"></p>
         </div>
         <div class="card">
           <h2>Most diagnostic trials</h2>
-          <p class="sub">The 8 of the 27 trials where the three models disagree most. Numbers are each model's noise-free predicted brownie − cupcake rating for that trial, not any one participant's data. These trials carry the most information about which model participants use.</p>
+          <p class="sub">The <span id="nDiag">8</span> of the <span class="nTrials">27</span> trials where the three models disagree most. Numbers are each model's noise-free predicted brownie − cupcake rating for that trial, not any one participant's data. These trials carry the most information about which model participants use.</p>
           <div class="tblwrap"><table id="diag"></table></div>
         </div>
       </div>
@@ -243,7 +266,7 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
       </div>
 
       <div class="card">
-        <h2>All 27 trials</h2>
+        <h2>All <span class="nTrials">27</span> trials</h2>
         <p class="sub">Simulated mean rating, brownie / cupcake, out of 100. Noise-free model predictions are in brackets.</p>
         <div class="tblwrap"><table id="allTable"></table></div>
       </div>
@@ -251,18 +274,25 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
   </div>
 
   <footer>
-    Bayesian participants: P(R<sub>A</sub> | d, K, W) ∝ P(d | R<sub>A</sub>, K, W) · P(R<sub>A</sub> | K, W), with U(d) = w<sub>A</sub>·R<sub>A</sub>(A's share) + w<sub>B</sub>·E<sub>K</sub>[R<sub>B</sub>(B's share)] and P(d) ∝ exp(β·U). W is known only as a condition; the likelihood is averaged over care values inside it. Their ratings are 100·E[r<sub>brownie</sub>] and 100·E[r<sub>cupcake</sub>] under the posterior; the prior over R<sub>A</sub> is uniform on an 11 × 11 grid. Heuristic participants (Kelley's discounting / augmentation): pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1), with k = +1, −1, 0 for B prefers brownie, cupcake, unknown and s<sub>W</sub> = 0, 0.5, 1 for A cares more about self, equally, more about B. Choice-as-preference participants: pref = choice. For these two models the ratings are 50 + 50·pref (brownie) and 50 − 50·pref (cupcake). Every rating gets the participant's offset plus Gaussian noise, then is rounded and clipped to 0–100.
+    Bayesian participants: P(R<sub>A</sub> | d, K, W) ∝ P(d | R<sub>A</sub>, K, W) · P(R<sub>A</sub> | K, W), with U(d) = w<sub>A</sub>·R<sub>A</sub>(A's share) + w<sub>B</sub>·E<sub>K</sub>[R<sub>B</sub>(B's share)] and P(d) ∝ exp(β·U), over every split d = (brownies, cupcakes) A could keep from the box. W is known only as a condition; the likelihood is averaged over care values inside it. Their ratings are 100·E[r<sub>brownie</sub>] and 100·E[r<sub>cupcake</sub>] under the posterior; the prior over R<sub>A</sub> is uniform on an 11 × 11 grid of independent tastes, or on 11 points with r<sub>brownie</sub> + r<sub>cupcake</sub> = 1 (the same space is used for B's taste). Choice (heuristic and choice-as-preference participants): −1 if A kept every cupcake in the box, +1 if A kept every brownie, otherwise (brownies kept − cupcakes kept) / items kept. Heuristic participants (Kelley's discounting / augmentation): pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1), with k = +1, −1, 0 for B prefers brownie, cupcake, unknown and s<sub>W</sub> = 0, 0.5, 1 for A cares more about self, equally, more about B. Choice-as-preference participants: pref = choice. For these two models the ratings are 50 + 50·pref (brownie) and 50 − 50·pref (cupcake). Every rating gets the participant's offset plus Gaussian noise, then is rounded and clipped to 0–100.
   </footer>
 </div>
 <script>
 // ===== Inferred-preference model engine (port of inferred_preference_model.py) =====
-const BOX = [2, 2], KEEP = 2;
+let BOX = [2, 2], KEEP = 2;
 const R_GRID = Array.from({length: 11}, (_, i) => i / 10);
-const R_SPACE = [];
-for (const a of R_GRID) for (const b of R_GRID) R_SPACE.push([a, b]);
-const NR = R_SPACE.length;
+// taste space for (r_brownie, r_cupcake): "indep" = 11 x 11 grid, "sum1" = r_brownie + r_cupcake = 1 (11 points)
+let R_SPACE = [], NR = 0;
+function setRSpace(mode) {
+  R_SPACE = mode === "sum1" ? R_GRID.map(a => [a, Math.round((1 - a) * 10) / 10]) : R_GRID.flatMap(a => R_GRID.map(b => [a, b]));
+  NR = R_SPACE.length;
+}
+setRSpace("indep");
 const CARE_GRID = Array.from({length: 21}, (_, i) => i / 20);
-const DECS = [[2, 0], [1, 1], [0, 2]];
+let DECS = [[2, 0], [1, 1], [0, 2]];
+// every split (brownies kept, cupcakes kept) A can take from the box, most brownies first
+function makeDecs(n1, n2, k) { const out = []; for (let x = Math.min(n1, k); x >= Math.max(0, k - n2); x--) out.push([x, k - x]); return out; }
+function setBox(n1, n2, k) { BOX = [n1, n2]; KEEP = k; DECS = makeDecs(n1, n2, k); }
 const close = (a, b) => Math.abs(a - b) < 1e-9;
 
 function maskNorm(m) { const s = m.reduce((a, b) => a + b, 0); return m.map(v => v / s); }
@@ -345,14 +375,14 @@ function EK(K) { let e1 = 0, e2 = 0; K.forEach((p, i) => { e1 += p * R_SPACE[i][
 function choiceProbs(r1, r2, Er1, Er2, wA, wB, rh, beta) {
   const [n1, n2] = BOX, U = DECS.map(([x, y]) =>
     beta * (wA * (r1 * Dsc(x, rh) + r2 * Dsc(y, rh)) + wB * (Er1 * Dsc(n1 - x, rh) + Er2 * Dsc(n2 - y, rh))));
-  const m = Math.max(...U), e = U.map(u => Math.exp(u - m)), s = e[0] + e[1] + e[2];
+  const m = Math.max(...U), e = U.map(u => Math.exp(u - m)), s = e.reduce((a, b) => a + b, 0);
   return e.map(v => v / s);
 }
 
 // likelihood L[iR][j], marginalised over W belief and rho prior
 function likelihood(K, pW, beta, rp, norm) {
   const [Er1, Er2] = EK(K);
-  const L = Array.from({length: NR}, () => [0, 0, 0]);
+  const nD = DECS.length, L = Array.from({length: NR}, () => new Array(nD).fill(0));
   CARE_GRID.forEach((c, wi) => {
     if (pW[wi] <= 0) return;
     const [wA, wB] = weights(c, norm);
@@ -360,7 +390,7 @@ function likelihood(K, pW, beta, rp, norm) {
       const p = pW[wi] * rp.w[ri];
       for (let i = 0; i < NR; i++) {
         const P = choiceProbs(R_SPACE[i][0], R_SPACE[i][1], Er1, Er2, wA, wB, rh, beta);
-        L[i][0] += p * P[0]; L[i][1] += p * P[1]; L[i][2] += p * P[2];
+        for (let j = 0; j < nD; j++) L[i][j] += p * P[j];
       }
     });
   });
@@ -377,7 +407,7 @@ function priorRA(K, pW, projection, norm) {
 // returns posteriors for all three decisions
 function posteriors(K, pW, beta, rp, projection, norm) {
   const L = likelihood(K, pW, beta, rp, norm), pr = priorRA(K, pW, projection, norm);
-  return [0, 1, 2].map(j => maskNorm(L.map((row, i) => row[j] * pr[i])));
+  return DECS.map((_, j) => maskNorm(L.map((row, i) => row[j] * pr[i])));
 }
 function summarize(post) {
   let pB = 0, pC = 0, e = 0;
@@ -385,10 +415,12 @@ function summarize(post) {
   return {pB, pC, pE: 1 - pB - pC, index: pB - pC, e};
 }
 
-if (typeof module !== "undefined") module.exports = {beliefK, beliefW, rhoPrior, posteriors, summarize, likelihood, CARE_GRID, R_SPACE};
+if (typeof module !== "undefined") module.exports = {setRSpace, setBox, makeDecs, beliefK, beliefW, rhoPrior, posteriors, summarize, likelihood, CARE_GRID, R_SPACE};
 // ===== App: simulate participants rating A's preference =====
 const $ = id => document.getElementById(id);
-const DEC_LBL = ["2 brownies", "1 + 1", "2 cupcakes"];
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const decLbl = ([x, y]) => y === 0 ? plural(x, "brownie") : x === 0 ? plural(y, "cupcake") : `${x} brownie + ${y} cupcake`;
+const decShort = ([x, y]) => `${x}B + ${y}C`;
 const KS = ["unknown", "brownie", "cupcake"];
 const K_LBL = {unknown: "A doesn't know B", brownie: "A knows B prefers brownie", cupcake: "A knows B prefers cupcake"};
 const K_SHORT = {unknown: "K: unknown", brownie: "K: B ▸ brownie", cupcake: "K: B ▸ cupcake"};
@@ -413,20 +445,45 @@ function wBelief(W) {
 }
 
 // the 27 trials
-const TRIALS = [];
-for (const K of KS) for (const W of WS) for (let d = 0; d < 3; d++) TRIALS.push({K, W, d});
+let TRIALS = [];
+function buildTrials() { TRIALS = []; for (const K of KS) for (const W of WS) for (let d = 0; d < DECS.length; d++) TRIALS.push({K, W, d}); }
 
 function readParams() {
   const a = Math.min(20, Math.max(0.1, +$("rhoA").value || 4)), b = Math.min(20, Math.max(0.1, +$("rhoB").value || 2));
+  const nB = +$("nB").value, nC = +$("nC").value;
   return {
-    beta: betaFrom(+$("beta").value), rho: $("rhoOn").checked ? [a, b] : null, norm: $("norm").value,
+    nB, nC, keep: Math.min(nB + nC - 1, Math.max(1, +$("keep").value || Math.floor((nB + nC) / 2))),
+    taste: $("taste").value, beta: betaFrom(+$("beta").value), rho: $("rhoOn").checked ? [a, b] : null, norm: $("norm").value,
     proj: +$("proj").value / 10, gamma: +$("gamma").value / 10,
     sigma: +$("sigma").value, indiv: +$("indiv").value,
     N: Math.min(5000, Math.max(5, Math.round(+$("N").value || 1000))), seed: Math.round(+$("seed").value || 1),
   };
 }
+// rebuild the "A keeps" options (1 .. total-1) and keep the current choice if it still fits
+let lastTotal = null;
+function syncKeep() {
+  const tot = +$("nB").value + +$("nC").value, sel = $("keep");
+  if (tot === lastTotal) return;
+  const prev = +sel.value, def = Math.floor(tot / 2);
+  const keepPrev = lastTotal !== null && prev >= 1 && prev <= tot - 1 && prev !== Math.floor(lastTotal / 2);
+  sel.innerHTML = Array.from({length: tot - 1}, (_, i) => `<option>${i + 1}</option>`).join("");
+  sel.value = String(keepPrev ? prev : def); lastTotal = tot;
+}
+function syncTask(P) {
+  $("boxViz").innerHTML = '<span class="it b"></span>'.repeat(P.nB) + '<span class="it c"></span>'.repeat(P.nC);
+  const boxTxt = `${plural(P.nB, "brownie")} and ${plural(P.nC, "cupcake")}`;
+  $("boxViz").setAttribute("aria-label", boxTxt);
+  $("taskBox").textContent = boxTxt; $("taskKeep").textContent = P.keep;
+  const decs = makeDecs(P.nB, P.nC, P.keep), nT = 9 * decs.length;
+  $("taskTrials").textContent = `${nT} trials per participant: 3 K × 3 W × ${decs.length} decisions`;
+  $("keepHint").textContent = `A can keep ${decs.map(decShort).join(", ")}; B gets the other ${P.nB + P.nC - P.keep}`;
+  document.querySelectorAll(".nTrials").forEach(e => e.textContent = nT);
+  $("nRatings").textContent = 2 * nT; $("nDiag").textContent = Math.min(8, nT);
+}
 function syncLabels() {
+  syncKeep();
   const P = readParams();
+  syncTask(P);
   $("betaV").textContent = P.beta.toFixed(1);
   $("projV").textContent = (P.proj >= 0 ? "+" : "") + P.proj.toFixed(1);
   $("gammaV").textContent = P.gamma.toFixed(1);
@@ -450,12 +507,14 @@ function predictions(P) {
   }
   const pred = {bayes: [], heur: [], choice: []};
   TRIALS.forEach(t => {
-    const ch = (DECS[t.d][0] - DECS[t.d][1]) / KEEP;
-    const h = Math.max(-1, Math.min(1, ch + P.gamma * S_W[t.W] * K_CODE[t.K]));
+    const [x, y] = DECS[t.d], ch = (x - y) / KEEP;
+    // choice (heuristic and choice-as-preference): taking every cupcake in the box = -1, every brownie = +1, otherwise the kept proportion
+    const hch = y === BOX[1] ? -1 : x === BOX[0] ? 1 : ch;
+    const h = Math.max(-1, Math.min(1, hch + P.gamma * S_W[t.W] * K_CODE[t.K]));
     const B = post[t.K + t.W][t.d];
     pred.bayes.push({b: B.b, c: B.c});
     pred.heur.push({b: 50 + 50 * h, c: 50 - 50 * h});
-    pred.choice.push({b: 50 + 50 * ch, c: 50 - 50 * ch});
+    pred.choice.push({b: 50 + 50 * hch, c: 50 - 50 * hch});
   });
   return {pred, post};
 }
@@ -517,7 +576,7 @@ const sgn = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v);
 let LAST = null, VIEW = "diff", SEL = {K: "brownie", W: "B"};
 const range = () => VIEW === "diff" ? [-100, 100] : [0, 100];
 const viewName = () => VIEW === "diff" ? "brownie − cupcake rating" : VIEW === "b" ? "brownie rating" : "cupcake rating";
-const trialIdx = (K, W, d) => KS.indexOf(K) * 9 + WS.indexOf(W) * 3 + d;
+const trialIdx = (K, W, d) => (KS.indexOf(K) * 3 + WS.indexOf(W)) * DECS.length + d;
 
 function render() {
   if (!LAST) return;
@@ -526,6 +585,16 @@ function render() {
   drawGrid(); drawConfusion(); drawDiag(); drawStrip(); drawAll();
 }
 
+// decision labels under an axis: full words when there's room, otherwise "xB / yC" stacked in two colored lines
+function decTick(g, L, cw, y, roomy, prefix = "") {
+  DECS.forEach((dec, d) => {
+    const cx = L + cw * (d + 0.5);
+    if (roomy) { T(g, cx, y, prefix + decLbl(dec), {"text-anchor": "middle", "font-size": 11}); return; }
+    const t = S("text", {x: cx, y, "text-anchor": "middle", "font-size": 11}, g);
+    const a = S("tspan", {x: cx, class: "tB"}, t); a.textContent = dec[0] + "B";
+    const b = S("tspan", {x: cx, dy: 12, class: "tC"}, t); b.textContent = dec[1] + "C";
+  });
+}
 function drawGrid() {
   const el = $("gridChart"), W0 = el.clientWidth || 800, narrow = W0 < 620;
   const cols = narrow ? 1 : 3, rows = narrow ? 9 : 3;
@@ -543,18 +612,18 @@ function drawGrid() {
     const g = S("g", {"aria-label": `${K_LBL[K]}, ${W_LBL[W]}`}, svg);
     S("rect", {x: ox, y: oy, width: panelW, height: panelH, rx: 8, fill: "var(--panel)", stroke: "var(--line)"}, g);
     T(g, ox + 10, oy + 17, narrow ? `${K_LBL[K]} · ${W_LBL[W]}` : (j === 0 ? K_LBL[K] : ""), {"font-size": 11.5, "font-weight": 600, style: "fill:var(--ink)"});
-    const L = ox + 40, R = ox + panelW - 10, top = oy + 28, bot = oy + panelH - 26;
+    const L = ox + 40, R = ox + panelW - 10, top = oy + 28, bot = oy + panelH - 34;
     const ys = v => top + (hi - v) / (hi - lo) * (bot - top);
     const ticks = VIEW === "diff" ? [-100, 0, 100] : [0, 50, 100];
     ticks.forEach(v => {
       S("line", {x1: L, x2: R, y1: ys(v), y2: ys(v), stroke: "var(--line)", "stroke-width": v === 0 && VIEW === "diff" ? 1.4 : 1}, g);
       T(g, L - 5, ys(v) + 4, VIEW === "diff" ? sgn(v) : String(v), {class: "tick", "text-anchor": "end"});
     });
-    const cw = (R - L) / 3;
-    [0, 1, 2].forEach(d => T(g, L + cw * (d + 0.5), bot + 16, DEC_LBL[d], {"text-anchor": "middle", "font-size": 11}));
+    const nD = DECS.length, cw = (R - L) / nD, idxs = DECS.map((_, d) => d);
+    decTick(g, L, cw, bot + 16, cw >= 74);
     MODELS.forEach((m, k) => {
       const dx = (k - 1) * Math.min(14, cw / 5);
-      const pts = [0, 1, 2].map(d => { const st = LAST.sim.stats[m.key][trialIdx(K, W, d)][VIEW]; return [L + cw * (d + 0.5) + dx, st.mean, st.sd]; });
+      const pts = idxs.map(d => { const st = LAST.sim.stats[m.key][trialIdx(K, W, d)][VIEW]; return [L + cw * (d + 0.5) + dx, st.mean, st.sd]; });
       S("polyline", {points: pts.map(p => `${p[0]},${ys(p[1])}`).join(" "), fill: "none", stroke: m.color, "stroke-width": 1.5, "stroke-opacity": 0.55}, g);
       pts.forEach(([x, mu, sd], d) => {
         S("line", {x1: x, x2: x, y1: ys(Math.min(hi, mu + sd)), y2: ys(Math.max(lo, mu - sd)), stroke: m.color, "stroke-width": 1.5, "stroke-opacity": 0.6}, g);
@@ -564,7 +633,7 @@ function drawGrid() {
         const pv = VIEW === "diff" ? p.b - p.c : VIEW === "b" ? p.b : p.c;
         const f = v => VIEW === "diff" ? sgn(+v.toFixed(1)) : v.toFixed(1);
         const show = () => {
-          tip.innerHTML = `<b>${m.name}</b> · A keeps ${DEC_LBL[d]}<br>${K_LBL[K]}, ${W_LBL[W].replace("A ", "")}<br>${viewName()}: mean ${f(mu)}, SD ${sd.toFixed(1)}<br>model prediction (no noise): ${f(pv)}`;
+          tip.innerHTML = `<b>${m.name}</b> · A keeps ${decLbl(DECS[d])}<br>${K_LBL[K]}, ${W_LBL[W].replace("A ", "")}<br>${viewName()}: mean ${f(mu)}, SD ${sd.toFixed(1)}<br>model prediction (no noise): ${f(pv)}`;
           tip.style.left = x + "px"; tip.style.top = ys(mu) + "px"; tip.hidden = false; dot.setAttribute("r", 6);
         };
         const hide = () => { tip.hidden = true; dot.setAttribute("r", 4); };
@@ -596,10 +665,10 @@ function drawDiag() {
   const rows = TRIALS.map((t, i) => {
     const v = MODELS.map(m => pred[m.key][i].b - pred[m.key][i].c);
     return {t, v, spread: Math.max(...v) - Math.min(...v)};
-  }).sort((a, b) => b.spread - a.spread).slice(0, 8);
+  }).sort((a, b) => b.spread - a.spread).slice(0, Math.min(8, TRIALS.length));
   let html = `<thead><tr><th>Condition</th><th>A keeps</th>${MODELS.map(m => `<th>${m.name.split(" ")[0]}</th>`).join("")}</tr></thead><tbody>`;
   rows.forEach(r => {
-    html += `<tr><td class="dec">${K_SHORT[r.t.K].slice(3)} · ${W_SHORT[r.t.W].slice(3)}</td><td class="dec">${DEC_LBL[r.t.d]}</td>${r.v.map(x => `<td class="${x > 0.5 ? "pos" : x < -0.5 ? "neg" : ""}">${sgn(Math.round(x))}</td>`).join("")}</tr>`;
+    html += `<tr><td class="dec">${K_SHORT[r.t.K].slice(3)} · ${W_SHORT[r.t.W].slice(3)}</td><td class="dec">${decLbl(DECS[r.t.d])}</td>${r.v.map(x => `<td class="${x > 0.5 ? "pos" : x < -0.5 ? "neg" : ""}">${sgn(Math.round(x))}</td>`).join("")}</tr>`;
   });
   $("diag").innerHTML = html + "</tbody>";
 }
@@ -608,16 +677,16 @@ function drawStrip() {
   const {K, W} = SEL;
   $("stripSub").textContent = `${K_LBL[K]}, ${W_LBL[W]}. Each dot is one participant's ${viewName()} (up to 300 per model); the dark tick is the mean.`;
   $("condChips").innerHTML = KS.flatMap(k => WS.map(w => `<button type="button" data-k="${k}" data-w="${w}" aria-pressed="${k === K && w === W}">${K_SHORT[k].slice(3)} · ${W_SHORT[w].slice(3)}</button>`)).join("");
-  const {svg, w, h} = svgFor($("strip"), 260);
-  const [lo, hi] = range(), L = 40, R = w - 8, top = 10, bot = h - 26;
+  const {svg, w, h} = svgFor($("strip"), 270);
+  const [lo, hi] = range(), L = 40, R = w - 8, top = 10, bot = h - 36;
   const ys = v => top + (hi - v) / (hi - lo) * (bot - top);
   (VIEW === "diff" ? [-100, -50, 0, 50, 100] : [0, 25, 50, 75, 100]).forEach(v => {
     S("line", {x1: L, x2: R, y1: ys(v), y2: ys(v), stroke: "var(--line)"}, svg);
     T(svg, L - 5, ys(v) + 4, VIEW === "diff" ? sgn(v) : String(v), {class: "tick", "text-anchor": "end"});
   });
-  const cw = (R - L) / 3, jr = mulberry32(11);
-  [0, 1, 2].forEach(d => {
-    T(svg, L + cw * (d + 0.5), h - 6, `A keeps ${DEC_LBL[d]}`, {"text-anchor": "middle", "font-size": 12, style: "fill:var(--ink)"});
+  const cw = (R - L) / DECS.length, jr = mulberry32(11);
+  decTick(svg, L, cw, bot + 18, cw >= 150, "A keeps ");
+  DECS.forEach((_, d) => {
     MODELS.forEach((m, k) => {
       const st = LAST.sim.stats[m.key][trialIdx(K, W, d)][VIEW];
       const cx = L + cw * d + cw * (k + 1) / 4, half = Math.min(18, cw / 10);
@@ -632,7 +701,7 @@ function drawAll() {
   const {stats, pred} = LAST.sim;
   let html = `<thead><tr><th>K</th><th>W</th><th>A keeps</th>${MODELS.map(m => `<th>${m.name}</th>`).join("")}</tr></thead><tbody>`;
   TRIALS.forEach((t, i) => {
-    html += `<tr><td class="dec">${K_SHORT[t.K].slice(3)}</td><td class="dec">${W_SHORT[t.W].slice(3)}</td><td class="dec">${DEC_LBL[t.d]}</td>` +
+    html += `<tr><td class="dec">${K_SHORT[t.K].slice(3)}</td><td class="dec">${W_SHORT[t.W].slice(3)}</td><td class="dec">${decLbl(DECS[t.d])}</td>` +
       MODELS.map(m => { const s = stats[m.key][i], p = pred[m.key][i];
         return `<td><span class="pos">${s.b.mean.toFixed(0)}</span> / <span class="neg">${s.c.mean.toFixed(0)}</span> <span class="muted">(${p.b.toFixed(0)} / ${p.c.toFixed(0)})</span></td>`; }).join("") + "</tr>";
   });
@@ -640,7 +709,7 @@ function drawAll() {
 }
 
 // ---------- wiring ----------
-function run() { syncLabels(); const P = readParams(); LAST = {P, sim: simulate(P)}; render(); }
+function run() { syncLabels(); const P = readParams(); setBox(P.nB, P.nC, P.keep); setRSpace(P.taste); buildTrials(); LAST = {P, sim: simulate(P)}; render(); }
 let timer = null;
 const schedule = () => { syncLabels(); clearTimeout(timer); timer = setTimeout(run, 120); };
 $("controls").addEventListener("input", schedule);
