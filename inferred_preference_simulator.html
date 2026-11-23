@@ -135,13 +135,13 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
 <div class="wrap">
   <header>
     <h1>Inferred Preference Simulator</h1>
-    <p class="lede">Simulate participants in the experiment. Each one watches A's decision under every K × W condition and rates how much A likes brownie and how much A likes cupcake. Three groups of participants answer as the three candidate models would, plus response noise.</p>
+    <p class="lede">Simulate participants in the experiment. Each one watches Alex's decision under every K × W condition and rates how much Alex likes brownie and how much Alex likes cupcake. Three groups of participants answer as the three candidate models would, plus response noise.</p>
   </header>
 
   <section class="task" aria-label="Task">
     <span class="lbl">Task</span>
     <div class="box" id="boxViz" aria-label=""></div>
-    <p>A box holds <b id="taskBox"></b>. A keeps <b id="taskKeep"></b> and B gets the rest. The participant is told what A knows about B (K) and how much A cares about B (W), sees what A kept, then rates on two 0–100 sliders: <b>how much does A like brownie?</b> and <b>how much does A like cupcake?</b></p>
+    <p>A box holds <b id="taskBox"></b>. Alex keeps <b id="taskKeep"></b> and Zoey gets the rest. The participant is told what Alex knows about Zoey (K) and how much Alex cares about Zoey (W), sees what Alex kept, then rates on two 0–100 sliders: <b>how much does Alex like brownie?</b> and <b>how much does Alex like cupcake?</b></p>
     <span class="fixed" id="taskTrials"></span>
   </section>
 
@@ -154,7 +154,7 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
           <label>Cupcakes <select id="nC"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select></label>
         </div>
         <div class="row">
-          <label for="keep">Items A keeps</label>
+          <label for="keep">Items Alex keeps</label>
           <select id="keep"></select>
           <span class="hint" id="keepHint"></span>
         </div>
@@ -163,9 +163,9 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
       <fieldset>
         <legend>Bayesian participants</legend>
         <div class="row">
-          <label for="beta">Assumed rationality of A, β <span class="val" id="betaV"></span></label>
+          <label for="beta">Assumed rationality of Alex, β <span class="val" id="betaV"></span></label>
           <input type="range" id="beta" min="0" max="100" step="1" value="65">
-          <span class="hint">0.5 (A chooses noisily) to 50 (A always picks the best option)</span>
+          <span class="hint">0.5 (Alex chooses noisily) to 50 (Alex always picks the best option)</span>
         </div>
         <div class="row">
           <span class="lab">Diminishing returns ρ ~ Beta(a, b)</span>
@@ -193,7 +193,7 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
         <div class="row">
           <label for="proj">Projection prior λ <span class="val" id="projV"></span></label>
           <input type="range" id="proj" min="-20" max="20" step="1" value="0">
-          <span class="hint">λ &gt; 0: a caring A is assumed to share B's taste. λ &lt; 0: contrast.</span>
+          <span class="hint">λ &gt; 0: a caring Alex is assumed to share Zoey's taste. λ &lt; 0: contrast.</span>
         </div>
       </fieldset>
       <hr>
@@ -202,7 +202,7 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
         <div class="row">
           <label for="gamma">Correction strength γ <span class="val" id="gammaV"></span></label>
           <input type="range" id="gamma" min="0" max="30" step="1" value="10">
-          <span class="hint">choice = −1 if A kept every cupcake, +1 if A kept every brownie, otherwise (brownies − cupcakes kept) / items kept. pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1)</span>
+          <span class="hint">choice = −1 if Alex kept every cupcake, +1 if Alex kept every brownie, otherwise (brownies − cupcakes kept) / items kept. pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1)</span>
         </div>
       </fieldset>
       <hr>
@@ -293,7 +293,7 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
   </div>
 
   <footer>
-    Bayesian participants: P(R<sub>A</sub> | d, K, W) ∝ P(d | R<sub>A</sub>, K, W) · P(R<sub>A</sub> | K, W), with U(d) = w<sub>A</sub>·R<sub>A</sub>(A's share) + w<sub>B</sub>·E<sub>K</sub>[R<sub>B</sub>(B's share)] and P(d) ∝ exp(β·U), over every split d = (brownies, cupcakes) A could keep from the box. W is known only as a condition; the likelihood is averaged over care values inside it. Their ratings are 100·E[r<sub>brownie</sub>] and 100·E[r<sub>cupcake</sub>] under the posterior; the prior over R<sub>A</sub> is uniform on an 11 × 11 grid of independent tastes, or on 11 points with r<sub>brownie</sub> + r<sub>cupcake</sub> = 1 (the same space is used for B's taste). Choice (heuristic and choice-as-preference participants): −1 if A kept every cupcake in the box, +1 if A kept every brownie, otherwise (brownies kept − cupcakes kept) / items kept. Heuristic participants (Kelley's discounting / augmentation): pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1), with k = +1, −1, 0 for B prefers brownie, cupcake, unknown and s<sub>W</sub> = 0, 0.5, 1 for A cares more about self, equally, more about B. Choice-as-preference participants: pref = choice. For these two models the ratings are 50 + 50·pref (brownie) and 50 − 50·pref (cupcake). Every rating gets the participant's offset plus Gaussian noise, then is rounded and clipped to 0–100.
+    Bayesian participants: P(R<sub>A</sub> | d, K, W) ∝ P(d | R<sub>A</sub>, K, W) · P(R<sub>A</sub> | K, W), with U(d) = w<sub>A</sub>·R<sub>A</sub>(Alex's share) + w<sub>B</sub>·E<sub>K</sub>[R<sub>B</sub>(Zoey's share)] and P(d) ∝ exp(β·U), over every split d = (brownies, cupcakes) Alex could keep from the box. W is known only as a condition; the likelihood is averaged over care values inside it. Their ratings are 100·E[r<sub>brownie</sub>] and 100·E[r<sub>cupcake</sub>] under the posterior; the prior over R<sub>A</sub> is uniform on an 11 × 11 grid of independent tastes, or on 11 points with r<sub>brownie</sub> + r<sub>cupcake</sub> = 1 (the same space is used for Zoey's taste). Choice (heuristic and choice-as-preference participants): −1 if Alex kept every cupcake in the box, +1 if Alex kept every brownie, otherwise (brownies kept − cupcakes kept) / items kept. Heuristic participants (Kelley's discounting / augmentation): pref = clip(choice + γ·s<sub>W</sub>·k, −1, 1), with k = +1, −1, 0 for Zoey prefers brownie, cupcake, unknown and s<sub>W</sub> = 0, 0.5, 1 for Alex cares more about self, equally, more about Zoey. Choice-as-preference participants: pref = choice. For these two models the ratings are 50 + 50·pref (brownie) and 50 − 50·pref (cupcake). Every rating gets the participant's offset plus Gaussian noise, then is rounded and clipped to 0–100.
   </footer>
 </div>
 <script>
@@ -309,7 +309,7 @@ function setRSpace(mode) {
 setRSpace("sum1");
 const CARE_GRID = Array.from({length: 21}, (_, i) => i / 20);
 let DECS = [[2, 0], [1, 1], [0, 2]];
-// every split (brownies kept, cupcakes kept) A can take from the box, most brownies first
+// every split (brownies kept, cupcakes kept) Alex can take from the box, most brownies first
 function makeDecs(n1, n2, k) { const out = []; for (let x = Math.min(n1, k); x >= Math.max(0, k - n2); x--) out.push([x, k - x]); return out; }
 function setBox(n1, n2, k) { BOX = [n1, n2]; KEEP = k; DECS = makeDecs(n1, n2, k); }
 const close = (a, b) => Math.abs(a - b) < 1e-9;
@@ -387,7 +387,7 @@ function rhoPrior(rho) { // rho: null (no discounting) or [a, b]
   return {mids, w: maskNorm(w)};
 }
 
-// expected B rewards under K
+// expected Zoey rewards under K
 function EK(K) { let e1 = 0, e2 = 0; K.forEach((p, i) => { e1 += p * R_SPACE[i][0]; e2 += p * R_SPACE[i][1]; }); return [e1, e2]; }
 
 // softmax choice probs for one R_A row, one (wA,wB,rho)
@@ -435,18 +435,18 @@ function summarize(post) {
 }
 
 if (typeof module !== "undefined") module.exports = {setRSpace, setBox, makeDecs, beliefK, beliefW, rhoPrior, posteriors, summarize, likelihood, CARE_GRID, R_SPACE};
-// ===== App: simulate participants rating A's preference =====
+// ===== App: simulate participants rating Alex's preference =====
 const $ = id => document.getElementById(id);
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const decLbl = ([x, y]) => y === 0 ? plural(x, "brownie") : x === 0 ? plural(y, "cupcake") : `${x} brownie + ${y} cupcake`;
 const decShort = ([x, y]) => `${x}B + ${y}C`;
 const KS = ["unknown", "brownie", "cupcake"];
-const K_LBL = {unknown: "A doesn't know B", brownie: "A knows B prefers brownie", cupcake: "A knows B prefers cupcake"};
-const K_SHORT = {unknown: "K: unknown", brownie: "K: B ▸ brownie", cupcake: "K: B ▸ cupcake"};
+const K_LBL = {unknown: "Alex doesn't know Zoey", brownie: "Alex knows Zoey prefers brownie", cupcake: "Alex knows Zoey prefers cupcake"};
+const K_SHORT = {unknown: "K: unknown", brownie: "K: Zoey ▸ brownie", cupcake: "K: Zoey ▸ cupcake"};
 const K_CODE = {unknown: 0, brownie: 1, cupcake: -1};
 const WS = ["self", "equal", "B"];
-const W_LBL = {self: "A cares more about self", equal: "A cares equally", B: "A cares more about B"};
-const W_SHORT = {self: "W: self > B", equal: "W: equal", B: "W: B > self"};
+const W_LBL = {self: "Alex cares more about self", equal: "Alex cares equally", B: "Alex cares more about Zoey"};
+const W_SHORT = {self: "W: self > Zoey", equal: "W: equal", B: "W: Zoey > self"};
 const S_W = {self: 0, equal: 0.5, B: 1};
 const MODELS = [
   {key: "bayes", name: "Bayesian", color: "var(--accent)"},
@@ -478,7 +478,7 @@ function readParams() {
     N: Math.min(5000, Math.max(5, Math.round(+$("N").value || 1000))), seed: Math.round(+$("seed").value || 1),
   };
 }
-// rebuild the "A keeps" options (1 .. total-1) and keep the current choice if it still fits
+// rebuild the "Alex keeps" options (1 .. total-1) and keep the current choice if it still fits
 let lastTotal = null;
 function syncKeep() {
   const tot = +$("nB").value + +$("nC").value, sel = $("keep");
@@ -495,7 +495,7 @@ function syncTask(P) {
   $("taskBox").textContent = boxTxt; $("taskKeep").textContent = P.keep;
   const decs = makeDecs(P.nB, P.nC, P.keep), nT = 9 * decs.length;
   $("taskTrials").textContent = `${nT} trials per participant: 3 K × 3 W × ${decs.length} decisions`;
-  $("keepHint").textContent = `A can keep ${decs.map(decShort).join(", ")}; B gets the other ${P.nB + P.nC - P.keep}`;
+  $("keepHint").textContent = `Alex can keep ${decs.map(decShort).join(", ")}; Zoey gets the other ${P.nB + P.nC - P.keep}`;
   document.querySelectorAll(".nTrials").forEach(e => e.textContent = nT);
   $("nRatings").textContent = 2 * nT; $("nDiag").textContent = Math.min(8, nT);
 }
@@ -648,7 +648,7 @@ function predictionRows() {
 
 function drawPredictions() {
   const rows = predictionRows();
-  let html = `<thead><tr><th>Trial</th><th>K</th><th>W</th><th>A keeps</th>` +
+  let html = `<thead><tr><th>Trial</th><th>K</th><th>W</th><th>Alex keeps</th>` +
     `<th>Bayes B</th><th>Bayes C</th><th>Bayes diff</th>` +
     `<th>Heuristic B</th><th>Heuristic C</th><th>Heuristic diff</th>` +
     `<th>Choice B</th><th>Choice C</th><th>Choice diff</th></tr></thead><tbody>`;
@@ -737,7 +737,7 @@ function drawGrid() {
           const valueLine = DISPLAY === "prediction"
             ? `noise-free ${viewName()}: ${f(pv)}`
             : `${viewName()}: mean ${f(mu)}, SD ${sd.toFixed(1)}<br>noise-free prediction: ${f(pv)}`;
-          tip.innerHTML = `<b>${m.name}</b> · A keeps ${decLbl(DECS[d])}<br>${K_LBL[K]}, ${W_LBL[W].replace("A ", "")}<br>${valueLine}`;
+          tip.innerHTML = `<b>${m.name}</b> · Alex keeps ${decLbl(DECS[d])}<br>${K_LBL[K]}, ${W_LBL[W].replace("Alex ", "")}<br>${valueLine}`;
           tip.style.left = x + "px"; tip.style.top = ys(mu) + "px"; tip.hidden = false; dot.setAttribute("r", 6);
         };
         const hide = () => { tip.hidden = true; dot.setAttribute("r", 4); };
@@ -770,7 +770,7 @@ function drawDiag() {
     const v = MODELS.map(m => pred[m.key][i].b - pred[m.key][i].c);
     return {t, v, spread: Math.max(...v) - Math.min(...v)};
   }).sort((a, b) => b.spread - a.spread).slice(0, Math.min(8, TRIALS.length));
-  let html = `<thead><tr><th>Condition</th><th>A keeps</th>${MODELS.map(m => `<th>${m.name.split(" ")[0]}</th>`).join("")}</tr></thead><tbody>`;
+  let html = `<thead><tr><th>Condition</th><th>Alex keeps</th>${MODELS.map(m => `<th>${m.name.split(" ")[0]}</th>`).join("")}</tr></thead><tbody>`;
   rows.forEach(r => {
     html += `<tr><td class="dec">${K_SHORT[r.t.K].slice(3)} · ${W_SHORT[r.t.W].slice(3)}</td><td class="dec">${decLbl(DECS[r.t.d])}</td>${r.v.map(x => `<td class="${x > 0.5 ? "pos" : x < -0.5 ? "neg" : ""}">${sgn(Math.round(x))}</td>`).join("")}</tr>`;
   });
@@ -789,7 +789,7 @@ function drawStrip() {
     T(svg, L - 5, ys(v) + 4, VIEW === "diff" ? sgn(v) : String(v), {class: "tick", "text-anchor": "end"});
   });
   const cw = (R - L) / DECS.length, jr = mulberry32(11);
-  decTick(svg, L, cw, bot + 18, cw >= 150, "A keeps ");
+  decTick(svg, L, cw, bot + 18, cw >= 150, "Alex keeps ");
   DECS.forEach((_, d) => {
     MODELS.forEach((m, k) => {
       const st = LAST.sim.stats[m.key][trialIdx(K, W, d)][VIEW];
@@ -803,7 +803,7 @@ function drawStrip() {
 
 function drawAll() {
   const {stats, pred} = LAST.sim;
-  let html = `<thead><tr><th>K</th><th>W</th><th>A keeps</th>${MODELS.map(m => `<th>${m.name}</th>`).join("")}</tr></thead><tbody>`;
+  let html = `<thead><tr><th>K</th><th>W</th><th>Alex keeps</th>${MODELS.map(m => `<th>${m.name}</th>`).join("")}</tr></thead><tbody>`;
   TRIALS.forEach((t, i) => {
     html += `<tr><td class="dec">${K_SHORT[t.K].slice(3)}</td><td class="dec">${W_SHORT[t.W].slice(3)}</td><td class="dec">${decLbl(DECS[t.d])}</td>` +
       MODELS.map(m => { const s = stats[m.key][i], p = pred[m.key][i];
