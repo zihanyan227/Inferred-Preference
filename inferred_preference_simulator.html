@@ -64,6 +64,8 @@ button { font: inherit; cursor: pointer; border-radius: 7px; }
 button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .run { background: var(--accent); color: var(--panel); border: 0; padding: 10px 12px; font-weight: 600; font-size: 15px; }
 .run:hover { filter: brightness(1.08); }
+.download { background: var(--panel); color: var(--accent); border: 1px solid var(--accent); padding: 7px 11px; font-weight: 600; }
+.download:hover { background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
 .presets { display: flex; flex-wrap: wrap; gap: 6px; }
 .presets button { background: var(--bg); color: var(--ink); border: 1px solid var(--line); padding: 4px 10px; font-size: 12px; border-radius: 99px; }
 .presets button:hover { border-color: var(--accent); color: var(--accent); }
@@ -109,6 +111,7 @@ svg .tB { fill: var(--brownie); font-weight: 600; } svg .tC { fill: var(--cupcak
 .heat figcaption { font-size: 12px; color: var(--ink2); margin-top: 4px; }
 .stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .segrow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; margin-bottom: 8px; }
+.view-controls { display: flex; flex-wrap: wrap; gap: 8px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .seg button { background: var(--panel); color: var(--ink2); border: 0; border-radius: 0; padding: 5px 12px; font-size: 13px; }
 .seg button + button { border-left: 1px solid var(--line); }
@@ -176,10 +179,9 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
         <div class="row">
           <label for="taste">Taste space (r<sub>brownie</sub>, r<sub>cupcake</sub>)</label>
           <select id="taste">
-            <option value="indep">Independent: each 0–1 (11 × 11 grid)</option>
-            <option value="sum1">r_brownie + r_cupcake = 1</option>
+            <option value="sum1" selected>r_brownie + r_cupcake = 1</option>
           </select>
-          <span class="hint">Applies to A's and B's tastes, Bayesian participants only. With the sum constraint, the two ratings add to 100.</span>
+          <span class="hint">Fixed for model comparison: all three models predict two ratings that add to 100.</span>
         </div>
         <div class="row">
           <label for="norm">Weight scale</label>
@@ -231,17 +233,34 @@ footer { color: var(--ink2); font-size: 12px; margin-top: 28px; max-width: 80ch;
 
     <main class="results">
       <div class="card">
-        <h2>Mean ratings in every condition</h2>
+        <h2 id="gridTitle">Noise-free model predictions</h2>
         <p class="sub" id="gridSub"></p>
         <div class="segrow">
-          <div class="seg" role="group" aria-label="Rating shown">
-            <button type="button" data-v="diff" aria-pressed="true">Brownie − cupcake</button>
-            <button type="button" data-v="b" aria-pressed="false">Brownie rating</button>
-            <button type="button" data-v="c" aria-pressed="false">Cupcake rating</button>
+          <div class="view-controls">
+            <div class="seg" id="sourceView" role="group" aria-label="Data source shown">
+              <button type="button" data-source="prediction" aria-pressed="true">Noise-free predictions</button>
+              <button type="button" data-source="simulation" aria-pressed="false">Simulated means</button>
+            </div>
+            <div class="seg" id="valueView" role="group" aria-label="Rating shown">
+              <button type="button" data-v="diff" aria-pressed="true">Brownie − cupcake</button>
+              <button type="button" data-v="b" aria-pressed="false">Brownie rating</button>
+              <button type="button" data-v="c" aria-pressed="false">Cupcake rating</button>
+            </div>
           </div>
           <div class="legend" id="legend"></div>
         </div>
         <div class="chart" id="gridChart"></div>
+      </div>
+
+      <div class="card">
+        <div class="segrow">
+          <div>
+            <h2>Noise-free model predictions</h2>
+            <p class="sub">One row per trial. These predictions are the means used later to generate simulated participant responses. Difference = brownie rating − cupcake rating.</p>
+          </div>
+          <button type="button" class="download" id="downloadPredictions">Download predictions CSV</button>
+        </div>
+        <div class="tblwrap"><table id="predictionTable"></table></div>
       </div>
 
       <div class="stack">
@@ -287,7 +306,7 @@ function setRSpace(mode) {
   R_SPACE = mode === "sum1" ? R_GRID.map(a => [a, Math.round((1 - a) * 10) / 10]) : R_GRID.flatMap(a => R_GRID.map(b => [a, b]));
   NR = R_SPACE.length;
 }
-setRSpace("indep");
+setRSpace("sum1");
 const CARE_GRID = Array.from({length: 21}, (_, i) => i / 20);
 let DECS = [[2, 0], [1, 1], [0, 2]];
 // every split (brownies kept, cupcakes kept) A can take from the box, most brownies first
@@ -573,7 +592,7 @@ function svgFor(el, h) { el.innerHTML = ""; const w = Math.max(280, el.clientWid
 const sgn = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v);
 
 // ---------- state ----------
-let LAST = null, VIEW = "diff", SEL = {K: "brownie", W: "B"};
+let LAST = null, VIEW = "diff", DISPLAY = "prediction", SEL = {K: "brownie", W: "B"};
 const range = () => VIEW === "diff" ? [-100, 100] : [0, 100];
 const viewName = () => VIEW === "diff" ? "brownie − cupcake rating" : VIEW === "b" ? "brownie rating" : "cupcake rating";
 const trialIdx = (K, W, d) => (KS.indexOf(K) * 3 + WS.indexOf(W)) * DECS.length + d;
@@ -581,18 +600,97 @@ const trialIdx = (K, W, d) => (KS.indexOf(K) * 3 + WS.indexOf(W)) * DECS.length 
 function render() {
   if (!LAST) return;
   $("legend").innerHTML = MODELS.map(m => `<span><span class="sw" style="background:${m.color}"></span>${m.name}</span>`).join("");
-  $("gridSub").textContent = `Each panel is one K × W condition; x is what A kept. Dots: mean ${viewName()} across ${LAST.P.N.toLocaleString()} participants per model. Bars: ±1 SD across participants.`;
-  drawGrid(); drawConfusion(); drawDiag(); drawStrip(); drawAll();
+  if (DISPLAY === "prediction") {
+    $("gridTitle").textContent = "Noise-free model predictions";
+    $("gridSub").textContent = `Each panel is one K × W condition. The three lines show each model's exact ${viewName()} before participant differences or response noise are added.`;
+  } else {
+    $("gridTitle").textContent = "Simulated participant means";
+    $("gridSub").textContent = `Each panel is one K × W condition. Dots show mean ${viewName()} across ${LAST.P.N.toLocaleString()} simulated participants per model; bars show ±1 SD.`;
+  }
+  drawGrid(); drawPredictions(); drawConfusion(); drawDiag(); drawStrip(); drawAll();
 }
 
-// decision labels under an axis: full words when there's room, otherwise "xB / yC" stacked in two colored lines
+function predictionRows() {
+  const {P, sim: {pred}} = LAST;
+  return TRIALS.map((t, i) => {
+    const d = DECS[t.d], bayes = pred.bayes[i], heuristic = pred.heur[i], choice = pred.choice[i];
+    return {
+      trial_id: i + 1,
+      K: t.K,
+      K_condition: K_LBL[t.K],
+      W: t.W,
+      W_condition: W_LBL[t.W],
+      decision_brownie: d[0],
+      decision_cupcake: d[1],
+      bayes_brownie: bayes.b,
+      bayes_cupcake: bayes.c,
+      bayes_diff: bayes.b - bayes.c,
+      heuristic_brownie: heuristic.b,
+      heuristic_cupcake: heuristic.c,
+      heuristic_diff: heuristic.b - heuristic.c,
+      choice_brownie: choice.b,
+      choice_cupcake: choice.c,
+      choice_diff: choice.b - choice.c,
+      box_brownie: P.nB,
+      box_cupcake: P.nC,
+      items_kept: P.keep,
+      beta: P.beta,
+      rho_a: P.rho ? P.rho[0] : "",
+      rho_b: P.rho ? P.rho[1] : "",
+      rho_mean: P.rho ? P.rho[0] / (P.rho[0] + P.rho[1]) : 1,
+      taste_space: P.taste,
+      weight_norm: P.norm,
+      projection_lambda: P.proj,
+      gamma: P.gamma,
+    };
+  });
+}
+
+function drawPredictions() {
+  const rows = predictionRows();
+  let html = `<thead><tr><th>Trial</th><th>K</th><th>W</th><th>A keeps</th>` +
+    `<th>Bayes B</th><th>Bayes C</th><th>Bayes diff</th>` +
+    `<th>Heuristic B</th><th>Heuristic C</th><th>Heuristic diff</th>` +
+    `<th>Choice B</th><th>Choice C</th><th>Choice diff</th></tr></thead><tbody>`;
+  rows.forEach(r => {
+    const num = x => Number(x).toFixed(2);
+    const diff = x => `<span class="${x > 0.005 ? "pos" : x < -0.005 ? "neg" : ""}">${x > 0 ? "+" : ""}${num(x)}</span>`;
+    html += `<tr><td>${r.trial_id}</td><td class="dec">${K_SHORT[r.K].slice(3)}</td>` +
+      `<td class="dec">${W_SHORT[r.W].slice(3)}</td><td class="dec">${r.decision_brownie}B + ${r.decision_cupcake}C</td>` +
+      `<td>${num(r.bayes_brownie)}</td><td>${num(r.bayes_cupcake)}</td><td>${diff(r.bayes_diff)}</td>` +
+      `<td>${num(r.heuristic_brownie)}</td><td>${num(r.heuristic_cupcake)}</td><td>${diff(r.heuristic_diff)}</td>` +
+      `<td>${num(r.choice_brownie)}</td><td>${num(r.choice_cupcake)}</td><td>${diff(r.choice_diff)}</td></tr>`;
+  });
+  $("predictionTable").innerHTML = html + "</tbody>";
+}
+
+function downloadPredictionsCSV() {
+  const rows = predictionRows();
+  const columns = Object.keys(rows[0]);
+  const csvCell = value => {
+    const formatted = typeof value === "number" && !Number.isInteger(value) ? value.toFixed(6) : String(value);
+    return /[",\n]/.test(formatted) ? `"${formatted.replaceAll('"', '""')}"` : formatted;
+  };
+  const csv = [columns.join(","), ...rows.map(row => columns.map(c => csvCell(row[c])).join(","))].join("\n");
+  const blob = new Blob(["\ufeff" + csv], {type: "text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url;
+  a.download = `model_predictions_${LAST.P.nB}B_${LAST.P.nC}C_keep${LAST.P.keep}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Compact decision labels under the chart axis.
 function decTick(g, L, cw, y, roomy, prefix = "") {
   DECS.forEach((dec, d) => {
     const cx = L + cw * (d + 0.5);
-    if (roomy) { T(g, cx, y, prefix + decLbl(dec), {"text-anchor": "middle", "font-size": 11}); return; }
     const t = S("text", {x: cx, y, "text-anchor": "middle", "font-size": 11}, g);
-    const a = S("tspan", {x: cx, class: "tB"}, t); a.textContent = dec[0] + "B";
-    const b = S("tspan", {x: cx, dy: 12, class: "tC"}, t); b.textContent = dec[1] + "C";
+    if (prefix) { const p = S("tspan", {}, t); p.textContent = prefix; }
+    const a = S("tspan", {class: "tB"}, t); a.textContent = dec[0] + "B";
+    const plus = S("tspan", {}, t); plus.textContent = " + ";
+    const b = S("tspan", {class: "tC"}, t); b.textContent = dec[1] + "C";
   });
 }
 function drawGrid() {
@@ -623,17 +721,23 @@ function drawGrid() {
     decTick(g, L, cw, bot + 16, cw >= 74);
     MODELS.forEach((m, k) => {
       const dx = (k - 1) * Math.min(14, cw / 5);
-      const pts = idxs.map(d => { const st = LAST.sim.stats[m.key][trialIdx(K, W, d)][VIEW]; return [L + cw * (d + 0.5) + dx, st.mean, st.sd]; });
-      S("polyline", {points: pts.map(p => `${p[0]},${ys(p[1])}`).join(" "), fill: "none", stroke: m.color, "stroke-width": 1.5, "stroke-opacity": 0.55}, g);
-      pts.forEach(([x, mu, sd], d) => {
-        S("line", {x1: x, x2: x, y1: ys(Math.min(hi, mu + sd)), y2: ys(Math.max(lo, mu - sd)), stroke: m.color, "stroke-width": 1.5, "stroke-opacity": 0.6}, g);
+      const pts = idxs.map(d => {
+        const i = trialIdx(K, W, d), p = LAST.sim.pred[m.key][i];
+        const pv = VIEW === "diff" ? p.b - p.c : VIEW === "b" ? p.b : p.c;
+        const st = LAST.sim.stats[m.key][i][VIEW];
+        return [L + cw * (d + 0.5) + dx, DISPLAY === "prediction" ? pv : st.mean, DISPLAY === "prediction" ? null : st.sd, pv];
+      });
+      S("polyline", {points: pts.map(p => `${p[0]},${ys(p[1])}`).join(" "), fill: "none", stroke: m.color, "stroke-width": DISPLAY === "prediction" ? 2.2 : 1.5, "stroke-opacity": DISPLAY === "prediction" ? 0.9 : 0.55}, g);
+      pts.forEach(([x, mu, sd, pv], d) => {
+        if (sd !== null) S("line", {x1: x, x2: x, y1: ys(Math.min(hi, mu + sd)), y2: ys(Math.max(lo, mu - sd)), stroke: m.color, "stroke-width": 1.5, "stroke-opacity": 0.6}, g);
         const dot = S("circle", {cx: x, cy: ys(mu), r: 4, fill: m.color}, g);
         const hit = S("circle", {cx: x, cy: ys(mu), r: 10, fill: "transparent", class: "hit"}, g);
-        const p = LAST.sim.pred[m.key][trialIdx(K, W, d)];
-        const pv = VIEW === "diff" ? p.b - p.c : VIEW === "b" ? p.b : p.c;
         const f = v => VIEW === "diff" ? sgn(+v.toFixed(1)) : v.toFixed(1);
         const show = () => {
-          tip.innerHTML = `<b>${m.name}</b> · A keeps ${decLbl(DECS[d])}<br>${K_LBL[K]}, ${W_LBL[W].replace("A ", "")}<br>${viewName()}: mean ${f(mu)}, SD ${sd.toFixed(1)}<br>model prediction (no noise): ${f(pv)}`;
+          const valueLine = DISPLAY === "prediction"
+            ? `noise-free ${viewName()}: ${f(pv)}`
+            : `${viewName()}: mean ${f(mu)}, SD ${sd.toFixed(1)}<br>noise-free prediction: ${f(pv)}`;
+          tip.innerHTML = `<b>${m.name}</b> · A keeps ${decLbl(DECS[d])}<br>${K_LBL[K]}, ${W_LBL[W].replace("A ", "")}<br>${valueLine}`;
           tip.style.left = x + "px"; tip.style.top = ys(mu) + "px"; tip.hidden = false; dot.setAttribute("r", 6);
         };
         const hide = () => { tip.hidden = true; dot.setAttribute("r", 4); };
@@ -715,9 +819,14 @@ const schedule = () => { syncLabels(); clearTimeout(timer); timer = setTimeout(r
 $("controls").addEventListener("input", schedule);
 $("controls").addEventListener("change", schedule);
 $("controls").addEventListener("submit", e => { e.preventDefault(); $("seed").value = 1 + Math.floor(Math.random() * 999998); run(); });
-document.querySelector(".seg").addEventListener("click", e => {
+$("downloadPredictions").addEventListener("click", downloadPredictionsCSV);
+$("valueView").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return; VIEW = b.dataset.v;
-  document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b)); render();
+  $("valueView").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); render();
+});
+$("sourceView").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return; DISPLAY = b.dataset.source;
+  $("sourceView").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); render();
 });
 $("condChips").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { SEL = {K: b.dataset.k, W: b.dataset.w}; render(); } });
 let rw = 0;
